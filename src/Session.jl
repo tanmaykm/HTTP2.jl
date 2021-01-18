@@ -2,10 +2,12 @@ module Session
 
 import HPack
 import HPack: DynamicTable
-import HTTP2: bytearr, Frame, Headers
-import HTTP2.Frame: ContinuationFrame, DataFrame, GoawayFrame, HeadersFrame, PingFrame, PriorityFrame, PushPromiseFrame, RstStreamFrame, SettingsFrame, WindowUpdateFrame
+import HTTP2: bytearr, Frame, Headers, Maybe
+import HTTP2.Frame: ContinuationFrame, DataFrame, GoawayFrame, HeadersFrame, PingFrame,
+                    PriorityFrame, PushPromiseFrame, RstStreamFrame, SettingsFrame,
+                    WindowUpdateFrame
 
-@enum STREAM_STATE IDLE=1 RESERVED_LOCAL=2 RESERVED_REMOTE=3 OPEN=4 HALF_CLOSED_REMOTE=5 HALF_CLOSED_LOCAL=6 CLOSED=7
+@enum STREAM_STATE IDLE=1 RESERVED_LOCAL RESERVED_REMOTE OPEN HALF_CLOSED_REMOTE HALF_CLOSED_LOCAL CLOSED
 
 mutable struct Priority
     dependent_stream_identifier::UInt32
@@ -28,7 +30,7 @@ end
 
 struct ActSendData
     stream_identifier::UInt32
-    data::Array{UInt8, 1}
+    data::Vector{UInt8}
     is_end_stream::Bool
 end
 
@@ -48,7 +50,7 @@ end
 
 struct EvtRecvData
     stream_identifier::UInt32
-    data::Array{UInt8, 1}
+    data::Vector{UInt8}
     is_end_stream::Bool
 end
 
@@ -58,15 +60,15 @@ mutable struct HTTPStream
     stream_identifier::UInt32
     state::STREAM_STATE
     window_size::UInt32
-    priority::Union{Nothing,Priority}
+    priority::Maybe{Priority}
 end
 
 mutable struct HTTPSettings
     push_enabled::Bool
-    max_concurrent_streams::Union{Nothing,UInt}
+    max_concurrent_streams::Maybe{UInt}
     initial_window_size::UInt
     max_frame_size::UInt
-    max_header_list_size::Union{Nothing,UInt}
+    max_header_list_size::Maybe{UInt}
 end
 
 HTTPSettings() = HTTPSettings(true, nothing, 65535, 16384, nothing)
@@ -74,7 +76,7 @@ HTTPSettings() = HTTPSettings(true, nothing, 65535, 16384, nothing)
 const DEFAULT_CHANNEL_SZ = 1024
 mutable struct HTTPConnection
     dynamic_table::DynamicTable
-    streams::Array{HTTPStream, 1}
+    streams::Vector{HTTPStream}
     window_size::UInt32
     isclient::Bool
     last_stream_identifier::UInt32
@@ -88,21 +90,22 @@ mutable struct HTTPConnection
 
     ## actions -> channel_act -> channel_act_raw -> io
     ## io -> channel_evt_raw -> channel_evt -> events
-    act_processor::Union{Nothing,Task}
-    act_raw_processor::Union{Nothing,Task}
-    evt_raw_processor::Union{Nothing,Task}
-    evt_processor::Union{Nothing,Task}
+    act_processor::Maybe{Task}
+    act_raw_processor::Maybe{Task}
+    evt_raw_processor::Maybe{Task}
+    evt_processor::Maybe{Task}
 
     function HTTPConnection(isclient)
         new(HPack.DynamicTable(),
-                       Vector{HTTPStream}(),
-                       1024,
-                       isclient,
-                       isclient ? 1 : 2,
-                       HTTPSettings(),
-                       false,
-                       Channel(DEFAULT_CHANNEL_SZ), Channel(DEFAULT_CHANNEL_SZ), Channel(DEFAULT_CHANNEL_SZ), Channel(DEFAULT_CHANNEL_SZ),
-                       nothing, nothing, nothing, nothing)
+            Vector{HTTPStream}(),
+            1024,
+            isclient,
+            isclient ? 1 : 2,
+            HTTPSettings(),
+            false,
+            Channel(DEFAULT_CHANNEL_SZ), Channel(DEFAULT_CHANNEL_SZ),
+            Channel(DEFAULT_CHANNEL_SZ), Channel(DEFAULT_CHANNEL_SZ),
+            nothing, nothing, nothing, nothing)
     end
 end
 
@@ -132,4 +135,4 @@ function take_evt!(connection::HTTPConnection)
     return take!(connection.channel_evt)
 end
 
-end
+end # module Session
