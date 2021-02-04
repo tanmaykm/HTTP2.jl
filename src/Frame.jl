@@ -98,4 +98,4 @@ encode(frame::ContinuationFrame) = encode_continuation(frame)
 
 export encode, decode, DataFrame, HeadersFrame, PriorityFrame, RstStreamFrame, SettingsFrame, PushPromiseFrame, PingFrame, GoawayFrame, WindowUpdateFrame, ContinuationFrame
 
-end
+end # module Frame
